@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  ticketflow_api:
+    build:
+      context: .
+      dockerfile: Dockerfile.ticketflow
+    ports:
+      - "8000:8000"
+
+  supportagent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    environment:
+      # Make sure to set your OpenAI API key in your environment before launching docker-compose.
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # Point the SupportAgent to the TicketFlow API service.
+      - TICKETFLOW_API_URL=http://ticketflow_api:8000
+    depends_on:
+      - ticketflow_api
+    stdin_open: true
+    tty: true

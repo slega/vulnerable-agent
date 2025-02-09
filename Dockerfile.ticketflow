@@ -1,0 +1,14 @@
+# Dockerfile.ticketflow
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements_ticketflow.txt .
+RUN pip install --no-cache-dir -r requirements_ticketflow.txt
+
+# Copy the API code
+COPY ticketflow_api.py .
+
+# Expose port 8000 and run the API with uvicorn
+CMD ["uvicorn", "ticketflow_api:app", "--host", "0.0.0.0", "--port", "8000"]
