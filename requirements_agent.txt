@@ -3,3 +3,7 @@ openai
 requests
 langchain-community
 langchain-core
+fastapi
+uvicorn
+langgraph
+langchain_openai

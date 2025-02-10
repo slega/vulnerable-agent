@@ -21,3 +21,5 @@ services:
       - ticketflow_api
     stdin_open: true
     tty: true
+    ports:
+      - "8001:8001"

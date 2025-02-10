@@ -1,15 +1,18 @@
-# Dockerfile.agent
+# Dockerfile.agent_api
 FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install dependencies
+# Install git (needed for cloning langchain_community) and update package lists.
+RUN apt-get update && apt-get install -y git
+
+# Copy and install dependencies.
 COPY requirements_agent.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements_agent.txt
 
-# Copy the agent code
+# Copy the agent API code.
 COPY support_agent.py .
 
-# Run the agent
-CMD ["python", "support_agent.py"]
+# Expose port 8001 and run the FastAPI server using uvicorn.
+CMD ["uvicorn", "support_agent:app", "--host", "0.0.0.0", "--port", "8001"]
