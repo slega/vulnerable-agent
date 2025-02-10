@@ -1,4 +1,3 @@
-# backend.py
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel

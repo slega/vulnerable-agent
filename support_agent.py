@@ -1,4 +1,3 @@
-# agent.py
 import os
 import json
 import requests
@@ -10,11 +9,9 @@ from langchain_openai import ChatOpenAI
 
 print("Starting application...")
 
-
 # --- Basic Models ---
 class QueryRequest(BaseModel):
     query: str
-
 
 # Updated state schema includes additional_kwargs.
 class AgentStateDict(TypedDict):
@@ -23,10 +20,8 @@ class AgentStateDict(TypedDict):
     auth_token: str
     additional_kwargs: Dict[str, Any]
 
-
 # Global session state keyed by the Bearer token.
 session_states: Dict[str, AgentStateDict] = {}
-
 
 # --- TOOL FUNCTIONS ---
 def list_tickets_tool(params: str, headers: Dict[str, str]) -> str:
@@ -42,7 +37,6 @@ def list_tickets_tool(params: str, headers: Dict[str, str]) -> str:
         return result
     else:
         return "We are experiencing technical issues. Please try again later."
-
 
 def create_ticket_tool(params: str, headers: Dict[str, str]) -> str:
     try:
@@ -79,7 +73,6 @@ def create_ticket_tool(params: str, headers: Dict[str, str]) -> str:
         print(f"Error in create_ticket_tool: {e}")
         return "We are experiencing technical issues. Please try again later."
 
-
 def update_ticket_tool(params: str, headers: Dict[str, str]) -> str:
     try:
         data = json.loads(params)
@@ -104,7 +97,6 @@ def update_ticket_tool(params: str, headers: Dict[str, str]) -> str:
     else:
         return "We are experiencing technical issues. Please try again later."
 
-
 def query_ticket_tool(params: str, headers: Dict[str, str]) -> str:
     try:
         ticket_id = int(params.strip())
@@ -120,7 +112,6 @@ def query_ticket_tool(params: str, headers: Dict[str, str]) -> str:
     else:
         return "We are experiencing technical issues. Please try again later."
 
-
 # --- HELPER FUNCTION ---
 def generate_ticket_title(description: str) -> str:
     title_prompt = f"Generate a concise title for this support ticket description: {description}"
@@ -129,7 +120,6 @@ def generate_ticket_title(description: str) -> str:
         {"role": "user", "content": title_prompt}
     ])
     return title_response.content.strip()
-
 
 # --- TOOL DEFINITIONS ---
 tools = [
@@ -191,8 +181,7 @@ tools = [
 ]
 
 # --- LLM SETUP ---
-llm = ChatOpenAI(model="gpt-4o-2024-08-06", temperature=0, max_tokens=300)
-
+llm = ChatOpenAI(model="o3-mini-2025-01-31", max_tokens=500)
 
 # --- AGENT NODE ---
 def agent(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -376,11 +365,9 @@ def tool_executor(state: Dict[str, Any]) -> Dict[str, Any]:
         "additional_kwargs": {}
     }
 
-
 # --- END NODE ---
 def end_node(state: Dict[str, Any]) -> Dict[str, Any]:
     return state
-
 
 # --- GRAPH SETUP ---
 print("Setting up graph...")
@@ -430,11 +417,9 @@ except Exception as e:
 # --- FASTAPI SETUP ---
 app = FastAPI(title="SupportAgent API")
 
-
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
-
 
 @app.post("/agent")
 async def run_agent(req: QueryRequest, authorization: str = Header(None)):
@@ -491,7 +476,6 @@ async def run_agent(req: QueryRequest, authorization: str = Header(None)):
             "response": "We are experiencing technical issues. Please try again later.",
             "token": auth_token
         }
-
 
 print("Application setup complete")
 
