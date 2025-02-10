@@ -7,8 +7,12 @@ services:
       dockerfile: Dockerfile.ticketflow
     ports:
       - "8000:8000"
+    volumes:
+      - ticketflow_data:/app/data
+    environment:
+      - DATABASE_URL=sqlite:///./data/ticketflow.db
 
-  supportagent:
+  support_agent:
     build:
       context: .
       dockerfile: Dockerfile.agent
@@ -23,3 +27,6 @@ services:
     tty: true
     ports:
       - "8001:8001"
+
+volumes:
+  ticketflow_data:
