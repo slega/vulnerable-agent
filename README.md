@@ -1,5 +1,5 @@
 # Description
-Launches a demo support bot (`support_agent.py`) that runs on chatgpt-4o-latest and is connected to the demo ticketing API (`ticketflow_api.py`).
+Launches a demo support bot (`support_agent.py`) that runs on 01 and is connected to the demo ticketing API (`ticketflow_api.py`).
 
 Supported functions:
 - Create a ticket for a user.
@@ -29,19 +29,8 @@ docker-compose up --build
 This command will run the API server on port 8000 and the agent on port 8001.
 
 # Usage
-1. Get an auth token:
-```shell
-curl --location 'http://localhost:8000/auth/token' \
---header 'Content-Type: application/json' \
---data '{"username": "martymcfly", "password": "Password1"}'
-```
+1. Open the UI on port 8501.
+2. Login using one of the initial users.
+3. Talk to the agent.
 
-2. Ask the agent:
-```shell
-curl --location 'http://localhost:8001/agent' \
---header 'Authorization: Bearer KNKNoqU1F9faCud9cq4m1ZO1ZCaGCcbfwFBnpCp-Seo' \
---header 'Content-Type: application/json' \
---data '{
-    "query": "Can you create a ticket for me please?"
-}'
-```
+![Agent demo](chat_screen.png)
