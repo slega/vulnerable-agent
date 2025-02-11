@@ -1,8 +1,6 @@
 import streamlit as st
 import os
 import requests
-from typing import Dict
-
 
 def init_session_state():
     if 'messages' not in st.session_state:
@@ -13,11 +11,8 @@ def init_session_state():
         st.session_state.auth_token = None
     if 'user_display_name' not in st.session_state:
         st.session_state.user_display_name = None
-    if 'input_key' not in st.session_state:
-        st.session_state.input_key = 0
     if 'should_rerun' not in st.session_state:
         st.session_state.should_rerun = False
-
 
 def try_login(username: str, password: str) -> tuple[bool, str]:
     try:
@@ -35,7 +30,6 @@ def try_login(username: str, password: str) -> tuple[bool, str]:
     except Exception as e:
         return False, f"Error during login: {str(e)}"
 
-
 def handle_login():
     if st.session_state.username and st.session_state.password:
         success, result = try_login(st.session_state.username, st.session_state.password)
@@ -50,41 +44,25 @@ def handle_login():
     else:
         st.warning("Please enter both username and password.")
 
-
 def display_login_page():
-    st.title("Vulnerable Support Agent Login")
-
     with st.container():
-        st.text_input("Username", key="username")
-        st.text_input("Password", type="password", key="password")
-        st.button("Login", on_click=handle_login, use_container_width=True)
+        _, col2, _ = st.columns(3)
 
-        st.markdown("</div></div>", unsafe_allow_html=True)
+        with col2:
+            col2.title("Support Agent Login")
+            col2.text_input("Username", key="username")
+            col2.text_input("Password", type="password", key="password")
+            col2.button("Login", on_click=handle_login, use_container_width=True)
 
-
-def display_chat_message(message: Dict[str, str], is_user: bool):
-    if is_user:
-        st.write(f'<div style="display: flex; justify-content: flex-end; margin: 10px 0;">'
-                 f'<div style="background-color: #007AFF; color: white; padding: 10px; '
-                 f'border-radius: 15px; max-width: 70%;">'
-                 f'{message["content"]}</div></div>', unsafe_allow_html=True)
-    else:
-        st.write(f'<div style="display: flex; justify-content: flex-start; margin: 10px 0;">'
-                 f'<div style="background-color: #E9ECEF; color: black; padding: 10px; '
-                 f'border-radius: 15px; max-width: 70%;">'
-                 f'{message["content"]}</div></div>', unsafe_allow_html=True)
-
+            col2.markdown("</div></div>", unsafe_allow_html=True)
 
 def handle_logout():
-    # Clear the state on logout
     st.session_state.clear()
     st.session_state.should_rerun = True
 
-
 def process_message(message: str):
     if message:
-        user_message = {"role": "user", "content": message}
-        st.session_state.messages.append(user_message)
+        st.session_state.messages.append({"role": "user", "content": message})
 
         try:
             response = requests.post(
@@ -101,45 +79,29 @@ def process_message(message: str):
                 st.session_state.messages.append(assistant_message)
             else:
                 st.error("Failed to get response from agent")
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": "I apologize, but I'm having trouble processing your request right now."
+                })
         except Exception as e:
             st.error(f"Error communicating with agent: {str(e)}")
-
-        # Increment input key to create a new input field
-        st.session_state.input_key += 1
-        st.session_state.should_rerun = True
-
-
-def handle_submit():
-    input_key = f"text_input_{st.session_state.input_key}"
-    if input_key in st.session_state and st.session_state[input_key]:
-        message = st.session_state[input_key]
-        process_message(message)
-
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": "I apologize, but I'm having trouble processing your request right now."
+            })
 
 def display_chat_interface():
     st.title(f"Support Agent Chat - {st.session_state.user_display_name}")
 
-    # Display chat history
-    chat_container = st.container()
-    with chat_container:
-        for message in st.session_state.messages:
-            display_chat_message(message, message["role"] == "user")
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
 
-    # Input for new message
-    with st.container():
-        st.write('<div style="height: 100px;"></div>', unsafe_allow_html=True)  # Spacer
-
-        # Create the text input with a unique key each time
-        st.text_input(
-            "Type your message:",
-            key=f"text_input_{st.session_state.input_key}",
-            placeholder="Ask about tickets or request support...",
-            on_change=handle_submit
-        )
-
+    if prompt := st.chat_input("Type your message..."):
+        process_message(prompt)
+        st.rerun()
 
 def display_sidebar():
-    """Display sidebar with instructions and additional info."""
     with st.sidebar:
         st.title("Support Agent")
         st.markdown("""
@@ -155,7 +117,6 @@ def display_sidebar():
 
         if st.button("Logout", use_container_width=True, on_click=handle_logout):
             pass
-
 
 def main():
     st.set_page_config(
@@ -175,7 +136,6 @@ def main():
     else:
         display_sidebar()
         display_chat_interface()
-
 
 if __name__ == "__main__":
     main()
