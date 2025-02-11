@@ -28,5 +28,22 @@ services:
     ports:
       - "8001:8001"
 
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.front
+    ports:
+      - "8501:8501"
+    environment:
+      - TICKETFLOW_API_URL=http://ticketflow_api:8000
+      - SUPPORT_AGENT_URL=http://support_agent:8001
+    depends_on:
+      - ticketflow_api
+      - support_agent
+    volumes:
+      - ./app.py:/app/app.py
+    stdin_open: true
+    tty: true
+
 volumes:
   ticketflow_data:
