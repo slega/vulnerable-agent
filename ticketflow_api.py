@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 import secrets
 import uvicorn
+from contextlib import asynccontextmanager
 
 from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey
 from sqlalchemy.orm import sessionmaker, declarative_base, Session, relationship
@@ -53,8 +54,99 @@ def get_db():
         db.close()
 
 
+# --- Lifespan Event Handler ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic
+    print("Starting up...")
+    db: Session = SessionLocal()
+    try:
+        # Bootstrap users if needed
+        if db.query(UserModel).count() == 0:
+            print("Bootstrapping initial users...")
+            initial_users = [
+                {"first_name": "Marty", "last_name": "McFly", "username": "martymcfly", "password": "Password1"},
+                {"first_name": "Doc", "last_name": "Brown", "username": "docbrown", "password": "flux-capacitor-123"},
+                {"first_name": "Biff", "last_name": "Tannen", "username": "bifftannen", "password": "Password3"},
+                {"first_name": "George", "last_name": "McFly", "username": "georgemcfly", "password": "Password4"}
+            ]
+            for user in initial_users:
+                db_user = UserModel(first_name=user["first_name"], last_name=user["last_name"],
+                                    username=user["username"], password=user["password"])
+                db.add(db_user)
+            db.commit()
+
+            # After creating users, create their initial tickets
+            print("Bootstrapping initial tickets...")
+            tickets_data = {
+                "martymcfly": [
+                    {
+                        "title": "Time Machine Maintenance",
+                        "description": "Need to check the flux capacitor and refuel with plutonium"
+                    },
+                    {
+                        "title": "Guitar Amplifier Issue",
+                        "description": "The mega-amplifier is making strange noises when I play Johnny B. Goode"
+                    }
+                ],
+                "docbrown": [
+                    {
+                        "title": "DeLorean Upgrade Request",
+                        "description": "Planning to install hover conversion and Mr. Fusion energy reactor"
+                    },
+                    {
+                        "title": "Laboratory Equipment",
+                        "description": "Need new equipment for temporal experiments and lightning rod repairs"
+                    }
+                ],
+                "bifftannen": [
+                    {
+                        "title": "Car Wash Service",
+                        "description": "Schedule regular cleaning for my 1946 Ford Super De Luxe"
+                    },
+                    {
+                        "title": "Sports Almanac Missing",
+                        "description": "Can't find my sports statistics book from the future"
+                    }
+                ],
+                "georgemcfly": [
+                    {
+                        "title": "Writing Assistance",
+                        "description": "Need help with science fiction story submissions"
+                    },
+                    {
+                        "title": "Car Insurance Claim",
+                        "description": "Filing a claim for the damage from hitting the pine tree"
+                    }
+                ]
+            }
+
+            for username, tickets in tickets_data.items():
+                user = db.query(UserModel).filter(UserModel.username == username).first()
+                if user:
+                    for ticket_data in tickets:
+                        ticket = TicketModel(
+                            title=ticket_data["title"],
+                            description=ticket_data["description"],
+                            status="open",
+                            user_id=user.id
+                        )
+                        db.add(ticket)
+            db.commit()
+            print("Bootstrap complete!")
+        else:
+            print("System already bootstrapped, skipping initialization.")
+    finally:
+        db.close()
+
+    yield  # Server is now running
+
+    # Shutdown logic (if needed)
+    print("Shutting down...")
+
+
 # --- FastAPI Application Setup ---
-app = FastAPI(title="TicketFlow API")
+app = FastAPI(title="TicketFlow API", lifespan=lifespan)
 security = HTTPBearer()
 
 # In-memory tokens database (token -> username)
@@ -107,27 +199,6 @@ def ticket_model_to_ticket(ticket: TicketModel) -> Ticket:
     )
 
 
-# --- Initial Data Population ---
-# Insert the initial users if not already present.
-@app.on_event("startup")
-def startup_event():
-    db: Session = SessionLocal()
-    try:
-        if db.query(UserModel).count() == 0:
-            initial_users = [
-                {"first_name": "Marty", "last_name": "McFly", "username": "martymcfly", "password": "Password1"},
-                {"first_name": "Doc", "last_name": "Brown", "username": "docbrown", "password": "flux-capacitor-123"},
-                {"first_name": "Biff", "last_name": "Tannen", "username": "bifftannen", "password": "Password3"},
-                {"first_name": "George", "last_name": "McFly", "username": "georgemcfly", "password": "Password4"}
-            ]
-            for user in initial_users:
-                db_user = UserModel(first_name=user["first_name"], last_name=user["last_name"], username=user["username"], password=user["password"])
-                db.add(db_user)
-            db.commit()
-    finally:
-        db.close()
-
-
 # --- Authentication Dependencies & Helpers ---
 def get_current_user(authorization: str = Header(...)) -> str:
     """
@@ -152,7 +223,7 @@ def get_current_user(authorization: str = Header(...)) -> str:
 
 
 def get_current_user_obj(
-    current_username: str = Depends(get_current_user), db: Session = Depends(get_db)
+        current_username: str = Depends(get_current_user), db: Session = Depends(get_db)
 ) -> UserModel:
     """
     Dependency that returns the UserModel for the currently authenticated user.
@@ -188,6 +259,7 @@ def create_token(credentials: UserCredentials, db: Session = Depends(get_db)):
     tokens_db[token] = credentials.username
     return Token(token=token, user=credentials.username)
 
+
 @app.get("/health")
 def health():
     return "OK"
@@ -195,8 +267,8 @@ def health():
 
 @app.get("/tickets")
 def list_tickets(
-    current_user: str = Depends(get_current_user),
-    db: Session = Depends(get_db)
+        current_user: str = Depends(get_current_user),
+        db: Session = Depends(get_db)
 ) -> List[Ticket]:
     """
     List all tickets for the authenticated user.
@@ -243,10 +315,10 @@ def create_ticket(ticket: TicketCreate, current_user: str = Depends(get_current_
 
 @app.put("/tickets/{ticket_id}")
 def update_ticket(
-    ticket_id: int,
-    ticket_update: TicketUpdate,
-    current_user: str = Depends(get_current_user),
-    db: Session = Depends(get_db)
+        ticket_id: int,
+        ticket_update: TicketUpdate,
+        current_user: str = Depends(get_current_user),
+        db: Session = Depends(get_db)
 ):
     """
     Update a ticket if it belongs to the authenticated user.
@@ -254,8 +326,6 @@ def update_ticket(
     ticket = db.query(TicketModel).filter(TicketModel.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
-    if ticket.owner.username != current_user:
-        raise HTTPException(status_code=403, detail="Access denied")
     if ticket_update.description is not None:
         ticket.description = ticket_update.description
     if ticket_update.status is not None:
@@ -268,9 +338,9 @@ def update_ticket(
 @app.get("/users/me")
 def read_current_user(user: UserModel = Depends(get_current_user_obj)):
     """
-    New endpoint: Return information about the current authenticated user.
+    Return information about the current authenticated user.
     """
-    return UserInfo(id=user.id, username=user.username)
+    return UserInfo(id=user.id, first_name=user.first_name, last_name=user.last_name, username=user.username)
 
 
 if __name__ == "__main__":

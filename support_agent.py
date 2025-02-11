@@ -301,7 +301,6 @@ def confirm_ticket(state: Dict[str, Any]) -> Dict[str, Any]:
             "additional_kwargs": {"function_call": function_call},
         }
 
-
 # --- TOOL EXECUTOR NODE ---
 def tool_executor(state: Dict[str, Any]) -> Dict[str, Any]:
     messages = state["messages"]
@@ -332,9 +331,9 @@ def tool_executor(state: Dict[str, Any]) -> Dict[str, Any]:
     else:
         tool_result = "We are experiencing technical issues. Please try again later."
 
+    # Instead of adding a 'function' role message, we'll just add the assistant's response
     return {
         "messages": messages + [
-            {"role": "function", "name": function_name, "content": tool_result},
             {"role": "assistant", "content": tool_result}
         ],
         "next": "end",
@@ -430,18 +429,10 @@ async def run_agent(req: QueryRequest, authorization: str = Header(None)):
         # Update session state
         session_states[auth_token] = final_state
 
-        # Get the actual tool responses
-        responses = [msg for msg in final_state["messages"] if msg.get("role") == "function"]
-
-        # If we have a tool response, use it; otherwise use the last assistant message
-        if responses:
-            response = responses[-1]["content"]
-            print(f"Tool response: {response}")
-        else:
-            # Get the last assistant message
-            assistant_msgs = [msg for msg in final_state["messages"] if msg.get("role") == "assistant"]
-            response = assistant_msgs[-1]["content"] if assistant_msgs else "No response available"
-            print(f"Assistant response: {response}")
+        # Get the last assistant message
+        assistant_msgs = [msg for msg in final_state["messages"] if msg.get("role") == "assistant"]
+        response = assistant_msgs[-1]["content"] if assistant_msgs else "No response available"
+        print(f"Assistant response: {response}")
 
         return {"response": response, "token": auth_token}
 
