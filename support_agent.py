@@ -236,7 +236,7 @@ Assistant: "" (WRONG - empty response)"""
             title = generate_ticket_title(description)
             new_args = {"description": description, "title": title}
             function_call["arguments"] = json.dumps(new_args)
-            confirmation_question = f"Please confirm your problem details: {description}. Is this correct? (Reply 'yes' to confirm or provide updated details.)"
+            confirmation_question = f"Please confirm your problem details: {description}. Is this correct?"
             return {
                 "messages": messages + [{"role": "assistant", "content": confirmation_question}],
                 "next": "confirm_ticket",
@@ -263,6 +263,7 @@ def confirm_ticket(state: Dict[str, Any]) -> Dict[str, Any]:
     messages = state["messages"]
     function_call = state.get("additional_kwargs", {}).get("function_call", {})
     last_user = next((msg for msg in reversed(messages) if msg["role"] == "user"), None)
+
     if not last_user:
         return {
             "messages": messages + [{"role": "assistant", "content": "Could you please confirm your ticket details?"}],
@@ -270,10 +271,36 @@ def confirm_ticket(state: Dict[str, Any]) -> Dict[str, Any]:
             "auth_token": state["auth_token"],
             "additional_kwargs": {"function_call": function_call},
         }
-    user_response = last_user["content"].strip().lower()
-    # TODO: Use llm.invoke instead
-    confirmation_words = {"yes", "correct", "confirm", "indeed"}
-    if any(word in user_response for word in confirmation_words):
+
+    user_response = last_user["content"].strip()
+
+    confirmation_prompt = [
+        {"role": "system", "content": """Determine if the user's response confirms their ticket details.
+            You MUST respond with ONLY the word 'true' if they confirmed, or 'false' if they provided new details or didn't confirm.
+            DO NOT include any other text or explanation in your response.
+
+            Example confirmations that should return 'true':
+            - "yes"
+            - "that's right"
+            - "looks good"
+            - "perfect"
+            - "that works"
+            - "yeah that's correct"
+
+            Example non-confirmations that should return 'false':
+            - any new details or modifications
+            - "no"
+            - "that's wrong"
+            - "change it"
+            - "can you modify"
+            - unclear or ambiguous responses"""},
+        {"role": "user", "content": f"Does this response confirm the ticket details? Response: '{user_response}'"}
+    ]
+
+    confirmation_response = llm.invoke(confirmation_prompt)
+    is_confirmed = confirmation_response.content.strip().lower() == 'true'
+
+    if is_confirmed:
         return {
             "messages": messages + [{"role": "assistant", "content": "Confirmation received. Creating your ticket..."}],
             "next": "tool_executor",
@@ -281,7 +308,7 @@ def confirm_ticket(state: Dict[str, Any]) -> Dict[str, Any]:
             "additional_kwargs": {"function_call": function_call},
         }
     else:
-        updated_description = last_user["content"].strip()
+        updated_description = user_response
         if len(updated_description.split()) < 5:
             return {
                 "messages": messages + [{"role": "assistant",
@@ -290,10 +317,12 @@ def confirm_ticket(state: Dict[str, Any]) -> Dict[str, Any]:
                 "auth_token": state["auth_token"],
                 "additional_kwargs": {"function_call": function_call},
             }
+
         title = generate_ticket_title(updated_description)
         new_args = {"description": updated_description, "title": title}
         function_call["arguments"] = json.dumps(new_args)
-        confirmation_question = f"Please confirm your updated ticket details: {updated_description}. Is this correct? (Reply 'yes' to confirm.)"
+        confirmation_question = f"Please confirm your updated ticket details: {updated_description}. Is this correct?"
+
         return {
             "messages": messages + [{"role": "assistant", "content": confirmation_question}],
             "next": "confirm_ticket",
